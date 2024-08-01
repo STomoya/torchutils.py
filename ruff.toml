@@ -3,8 +3,6 @@ indent-width = 4
 
 target-version = "py310"
 
-src = ["storch"]
-
 exclude = ["train_*.py"]
 
 [lint.per-file-ignores]
