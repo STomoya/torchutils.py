@@ -1193,7 +1193,7 @@ def save_checkpoint(
     if isinstance(model, Sequence):
         assert isinstance(optimizer, Sequence), 'If using multiple models, optimizer must also be a list.'
         assert len(model) == len(optimizer), 'model and optimizer must be same length.'
-        for i, (m, o) in enumerate(zip(model, optimizer, strict=False)):
+        for i, (m, o) in enumerate(zip(model, optimizer)):  # noqa: B905
             save_model(checkpoint_dir, m, f'model.{i}')
             if o is not None:
                 _save_optimizer(checkpoint_dir, m, o, name=f'optim.{i}')
