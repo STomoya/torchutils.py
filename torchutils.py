@@ -114,6 +114,12 @@ def is_distributed() -> bool:
     return dist.is_initialized()
 
 
+def destroy_process_group() -> None:
+    """Destroy process group."""
+    if is_distributed():
+        dist.destroy_process_group()
+
+
 def is_torchrun() -> bool:
     """Is called via torchrun command."""
     return dist.is_torchelastic_launched()
