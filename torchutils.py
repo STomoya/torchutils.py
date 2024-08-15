@@ -1,5 +1,9 @@
 """Copy & paste-able utilities for writing training codes with PyTorch in a single file.
 
+# URL
+
+https://github.com/STomoya/torchutils.py
+
 # copyright
 
 MIT License
