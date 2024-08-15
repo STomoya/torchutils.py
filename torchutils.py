@@ -1100,7 +1100,7 @@ def _naive_set_optim_state_dict(model: nn.Module, optimizer: Optimizer, state_di
 def load_model(dir: str, model: nn.Module, name: str = 'model', map_location='cpu', strict: bool = True):
     """Load state_dict to model."""
     state_path = os.path.join(dir, name + '.pt')
-    state_dict = torch.load(state_path, map_location=map_location)
+    state_dict = torch.load(state_path, map_location=map_location, weights_only=True)
     if dcpsd is not None and is_distributed():
         option = dcpsd.StateDictOptions(full_state_dict=True, cpu_offload=True, strict=strict)
         dcpsd.set_model_state_dict(model, state_dict, options=option)
