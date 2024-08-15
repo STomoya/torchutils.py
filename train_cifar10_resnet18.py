@@ -206,6 +206,8 @@ def main():
             )
         )
 
+    torchutils.destroy_process_group()
+
 
 if __name__ == '__main__':
     main()
