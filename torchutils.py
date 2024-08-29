@@ -697,17 +697,20 @@ def update_ema(module: nn.Module, module_ema: nn.Module, beta: float, copy_buffe
 #######################################################################################################################
 
 
-def _warmup(current_step: int, num_warmup_steps: int):
+def _warmup(current_step: int, num_warmup_steps: int, warmup_scale: float | None = None):
     """Calc factor on warmup."""
+    if warmup_scale is not None:
+        return warmup_scale
     return current_step / max(1.0, num_warmup_steps)
 
 
-def _get_constant_schedule(num_warmup_steps: int | None = None) -> Callable:
+def _get_constant_schedule(num_warmup_steps: int | None = None, warmup_scale: float | None = None) -> Callable:
     """Get function for constant schedule.
 
     Args:
     ----
         num_warmup_steps (int, optional): number of warmup steps.
+        warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
     -------
@@ -722,13 +725,15 @@ def _get_constant_schedule(num_warmup_steps: int | None = None) -> Callable:
 
         def lr_lambda(current_step: int):
             if current_step < num_warmup_steps:
-                return _warmup(current_step, num_warmup_steps)
+                return _warmup(current_step, num_warmup_steps, warmup_scale)
             return 1.0
 
     return lr_lambda
 
 
-def _get_multistep_schedule(milestones: list, num_warmup_steps: int | None = None, gamma=0.1) -> Callable:
+def _get_multistep_schedule(
+    milestones: list, num_warmup_steps: int | None = None, gamma=0.1, warmup_scale: float | None = None
+) -> Callable:
     """Create function for multistep schedules.
 
     Args:
@@ -736,6 +741,7 @@ def _get_multistep_schedule(milestones: list, num_warmup_steps: int | None = Non
         milestones (list): list of steps on where to decay.
         num_warmup_steps (int, optional): number of warmup steps.
         gamma (float, optional): factor to decay on each milestone. Defaults to 0.1.
+        warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
     -------
@@ -752,20 +758,23 @@ def _get_multistep_schedule(milestones: list, num_warmup_steps: int | None = Non
 
         def lr_lambda(current_step: int):
             if current_step < num_warmup_steps:
-                return _warmup(current_step, num_warmup_steps)
+                return _warmup(current_step, num_warmup_steps, warmup_scale)
             bigger_count = sum(milestones < current_step)
             return gamma**bigger_count
 
     return lr_lambda
 
 
-def _get_linear_schedule(num_training_steps: int, num_warmup_steps: int | None) -> Callable:
+def _get_linear_schedule(
+    num_training_steps: int, num_warmup_steps: int | None, warmup_scale: float | None = None
+) -> Callable:
     """Create function for linear schedule.
 
     Args:
     ----
         num_training_steps (int): total number of training steps.
         num_warmup_steps (int, optional): number of warmup steps.
+        warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
     -------
@@ -780,14 +789,19 @@ def _get_linear_schedule(num_training_steps: int, num_warmup_steps: int | None) 
 
         def lr_lambda(current_step: int):
             if current_step < num_warmup_steps:
-                return _warmup(current_step, num_warmup_steps)
+                return _warmup(current_step, num_warmup_steps, warmup_scale)
             return max(0.0, (num_training_steps - current_step) / max(1.0, num_training_steps - num_warmup_steps))
 
     return lr_lambda
 
 
 def _get_polynomial_decay_schedule(
-    num_training_steps: int, num_warmup_steps: int | None, lr_init: float, power: float = 1.0, lr_end: float = 1e-7
+    num_training_steps: int,
+    num_warmup_steps: int | None,
+    lr_init: float,
+    power: float = 1.0,
+    lr_end: float = 1e-7,
+    warmup_scale: float | None = None,
 ) -> Callable:
     """Create function for polynomial decay schedule.
 
@@ -798,6 +812,7 @@ def _get_polynomial_decay_schedule(
         lr_init (float): initial learning rate.
         power (float, optional): _description_. Defaults to 1.0.
         lr_end (float, optional): _description_. Defaults to 1e-7.
+        warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
     -------
@@ -818,7 +833,7 @@ def _get_polynomial_decay_schedule(
 
         def lr_lambda(current_step: int):
             if current_step < num_warmup_steps:
-                return _warmup(current_step, num_warmup_steps)
+                return _warmup(current_step, num_warmup_steps, warmup_scale)
             if current_step > num_training_steps:
                 return lr_end / lr_init
             lr_range = lr_init - lr_end
@@ -831,7 +846,10 @@ def _get_polynomial_decay_schedule(
 
 
 def _get_cosine_schedule(
-    num_training_steps: int, num_warmup_steps: int | None = None, num_cycles: float = 0.5
+    num_training_steps: int,
+    num_warmup_steps: int | None = None,
+    num_cycles: float = 0.5,
+    warmup_scale: float | None = None,
 ) -> Callable:
     """Create function for consine schedule.
 
@@ -840,6 +858,7 @@ def _get_cosine_schedule(
         num_training_steps (int): total number of training steps.
         num_warmup_steps (int, optional): number of warmup steps.
         num_cycles (float, optional): The number of waves in the cosine schedule. Default: 0.5.
+        warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
     -------
@@ -855,7 +874,7 @@ def _get_cosine_schedule(
 
         def lr_lambda(current_step: int):
             if current_step < num_warmup_steps:
-                return _warmup(current_step, num_warmup_steps)
+                return _warmup(current_step, num_warmup_steps, warmup_scale)
             progress = (current_step - num_warmup_steps) / max(1, num_training_steps - num_warmup_steps)
             return max(0.0, 0.5 * (1.0 + math.cos(math.pi * num_cycles * 2.0 * progress)))
 
@@ -869,6 +888,7 @@ def create_scheduler(
     *,
     num_iter_per_step: int = 1,
     num_warmup_steps: int | None = None,
+    warmup_scale: float | None = None,
     milestones: list[int] | None = None,
     gamma: float = 0.1,
     power: float = 1.0,
@@ -891,6 +911,7 @@ def create_scheduler(
             to use iterations use num_iters_per_step or pass in iterations as steps.
         num_iter_per_step (int, optional): number of iterations per step. Default: 1.
         num_warmup_steps (int, optional): number of warmup steps. If None, no warmup phase. Default: None.
+        warmup_scale (float, optional): Constant used to scale lr in warmup. Default: None.
         milestones (list[int], optional): milestones for multistep scheduler. Default: None.
         gamma (float, optional): gamma for multistep scheduler. Default: 0.1.
         power (float, optional): power for polynomial decay schedule.
@@ -905,18 +926,20 @@ def create_scheduler(
     num_warmup_steps = num_warmup_steps * num_iter_per_step if num_warmup_steps is not None else None
 
     if type == 'constant':
-        lr_lambda = _get_constant_schedule(num_warmup_steps)
+        lr_lambda = _get_constant_schedule(num_warmup_steps, warmup_scale=warmup_scale)
     elif type == 'linear':
-        lr_lambda = _get_linear_schedule(num_training_steps, num_warmup_steps)
+        lr_lambda = _get_linear_schedule(num_training_steps, num_warmup_steps, warmup_scale=warmup_scale)
     elif type in ('poly', 'polynomial'):
         lr_init = optimizer.defaults['lr']
-        lr_lambda = _get_polynomial_decay_schedule(num_training_steps, num_warmup_steps, lr_init, power)
+        lr_lambda = _get_polynomial_decay_schedule(
+            num_training_steps, num_warmup_steps, lr_init, power, warmup_scale=warmup_scale
+        )
     elif type == 'multistep':
         assert milestones is not None
         milestones = [milestone * num_iter_per_step for milestone in milestones]
-        lr_lambda = _get_multistep_schedule(milestones, num_warmup_steps, gamma)
+        lr_lambda = _get_multistep_schedule(milestones, num_warmup_steps, gamma, warmup_scale=warmup_scale)
     elif type == 'cosine':
-        lr_lambda = _get_cosine_schedule(num_training_steps, num_warmup_steps)
+        lr_lambda = _get_cosine_schedule(num_training_steps, num_warmup_steps, warmup_scale=warmup_scale)
     else:
         raise Exception(f'build_scheduler: No such scheduler type "{type}".')
 
