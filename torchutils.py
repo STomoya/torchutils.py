@@ -45,7 +45,7 @@ if parse_version(torch.__version__) >= parse_version('2.3.0'):
 else:
     dcpsd = None
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 
 class _State:
