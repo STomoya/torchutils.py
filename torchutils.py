@@ -935,7 +935,7 @@ def wrap_module(module: nn.Module, strategy: str, compile: bool | str = False) -
             mode option. Default: False.
 
     Returns:
-        tuple[nn.Module, nn.Module]: Wrapped module and compiled module.
+        (tuple[nn.Module, nn.Module]): Wrapped module and compiled module.
 
     """
     # str if compile is enabled, False otherwise.
@@ -1256,7 +1256,7 @@ def get_grad_scaler(enabled=True, is_fsdp=False) -> GradScaler | None:
         is_fsdp (bool, optional): is distributed mode FSDP? Default: False.
 
     Returns:
-        GradScaler | None: gradient scaler class
+        (GradScaler | None): gradient scaler class
 
     """
     scaler = GradScaler(enabled=enabled) if not is_fsdp else ShardedGradScaler(enabled=enabled)
