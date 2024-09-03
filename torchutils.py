@@ -374,13 +374,15 @@ class Timer:
     def step(self):
         """Stop then restart timer immediately.
 
-        Usage:
-            >>> timer = Timer()
-            >>> timer.start()
-            >>> for i in range(n_iters):
-            ...     train_epoch()
-            ...     timer.step()
-            ...     print(timer.eta(n_iters - i))
+        Example:
+            ```python
+            timer = Timer()
+            timer.start()
+            for i in range(n_iters):
+                train_epoch()
+                timer.step()
+                print(timer.eta(n_iters - i))
+            ```
         """
         self.stop()
         self.start()
