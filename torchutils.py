@@ -521,6 +521,8 @@ class LoggerWithInterval:
         self.frequent_interval = frequent_interval
         self.first_and_last = first_and_last
 
+        self.logged = False
+
     def log(self, msg: str, level: str = 'info'):
         """Log message.
 
@@ -550,6 +552,9 @@ class LoggerWithInterval:
             or force
         ):
             self.log(msg=msg, level=level)
+            self.logged = True
+        else:
+            self.logged = False
 
     @classmethod
     def new(  # noqa: D102
