@@ -473,6 +473,96 @@ def get_vram_usage(format: str = '{vram_usage:5.2f}%'):
     return format.format(vram_usage=vram_usage_percent)
 
 
+class LoggerWithInterval:
+    """Logger with interval."""
+
+    def __init__(
+        self,
+        logger: logging.Logger,
+        interval: int,
+        max_iterations: int | None = None,
+        frequent_until: int = 100,
+        frequent_interval: int = 5,
+        first_and_last: bool = True,
+    ):
+        """Logger with interval.
+
+        Args:
+        ----
+            logger (logging.Logger): The logger.
+            interval (int): Log interval.
+            frequent_until (int, optional): Log frequently for the first N iterations. Set to 0 to disable. Default: 100
+            frequent_interval (int, optional): Interval for the first `frequent_until` iterations. Default: 5
+            first_and_last (bool, optional): Always log on first and last iteration. Default: True
+            max_iterations (int | None, optional): Maximum iterations. Required if the last iterations should be logged.
+                Default: None
+
+        """
+        self.logger = logger
+
+        self.max_iterations = max_iterations
+        self.interval = interval
+        self.frequent_until = frequent_until
+        self.frequent_interval = frequent_interval
+        self.first_and_last = first_and_last
+
+    def log(self, msg: str, level: str = 'info'):
+        """Log message.
+
+        Args:
+        ----
+            msg (str): The message to log.
+            level (str, optional): Log level in string. Default: 'info'.
+
+        """
+        getattr(self.logger, level)(msg)
+
+    def __call__(self, msg: str, current: int, force: bool = False, level: str = 'info'):
+        """Log.
+
+        Args:
+        ----
+            msg (str): The message to log.
+            current (int): Current iteration count.
+            force (bool, optional): Force logging. Default: False.
+            level (str, optional): Log level in string. Default: 'info'.
+
+        """
+        if (
+            current % self.interval == 0
+            or (current < self.frequent_until and current % self.frequent_interval == 0)
+            or (self.first_and_last and current in (self.max_iterations, 1))
+            or force
+        ):
+            self.log(msg=msg, level=level)
+
+    @classmethod
+    def new(  # noqa: D102
+        cls,
+        name: str,
+        interval: int,
+        level: int = logging.DEBUG,
+        filename: str | None = None,
+        mode: str = 'a',
+        format: str = '%(asctime)s | %(name)s | %(filename)s | %(levelname)s | - %(message)s',
+        auxiliary_handlers: list | None = None,
+        frequent_until: int = 100,
+        frequent_interval: int = 5,
+        first_and_last: bool = True,
+        max_iterations: int | None = None,
+    ):
+        logger = get_logger(name, level, filename, mode, format, auxiliary_handlers)
+        logger = cls(
+            logger,
+            interval=interval,
+            frequent_until=frequent_until,
+            frequent_interval=frequent_interval,
+            first_and_last=first_and_last,
+            max_iterations=max_iterations,
+        )
+        return logger
+
+
 #######################################################################################################################
 ### Dataset                                                                                                         ###
 #######################################################################################################################
