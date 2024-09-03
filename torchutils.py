@@ -463,6 +463,16 @@ def get_logger(
     return logger
 
 
+def get_vram_usage(format: str = '{vram_usage:5.2f}%'):
+    """Calculate the current VRAM usage."""
+    if torch.cuda.is_available():
+        _, global_total = torch.cuda.mem_get_info()
+        vram_usage_percent = torch.cuda.memory_reserved() / global_total * 100
+    else:
+        vram_usage_percent = 0.0
+    return format.format(vram_usage=vram_usage_percent)
+
+
 #######################################################################################################################
 ### Dataset                                                                                                         ###
 #######################################################################################################################
