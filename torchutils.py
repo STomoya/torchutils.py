@@ -563,6 +563,54 @@ class LoggerWithInterval:
         return logger
 
 
+class AverageMeter:
+    """AverageMeter."""
+
+    def __init__(self, name: str, format: str = '{name}: {avg:10.5f}'):
+        """AverageMeter.
+
+        Args:
+        ----
+            name (str): Name.
+            format (str, optional): Format for printing. Default: '{name}: {value:10.5f}'
+
+        """
+        self.name = name
+        self.format = format
+        self.val = 0.0
+        self.sum = 0.0
+        self.avg = 0.0
+        self.count = 0
+
+    def reset(self):
+        """Reset."""
+        self.val = 0.0
+        self.sum = 0.0
+        self.avg = 0.0
+        self.count = 0
+
+    def update(self, value: float | torch.Tensor):
+        """Update.
+
+        Args:
+        ----
+            value (float | torch.Tensor): Value to average.
+
+        """
+        if torch.is_tensor(value):
+            value = value.detach()
+            self.sum += value.sum().item()
+            self.count += value.numel()
+        else:
+            self.sum += value
+            self.count += 1
+        self.avg = self.sum / self.count
+
+    def __str__(self):
+        """Str."""
+        return self.format.format(**self.__dict__)
+
+
 #######################################################################################################################
 ### Dataset                                                                                                         ###
 #######################################################################################################################
