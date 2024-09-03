@@ -383,6 +383,21 @@ class Timer:
         if self.durations is not None:
             self.durations.append(duration)
 
+    def step(self):
+        """Stop then restart timer immediately.
+
+        Usage:
+        -----
+            >>> timer = Timer()
+            >>> timer.start()
+            >>> for i in range(n_iters):
+            ...     train_epoch()
+            ...     timer.step()
+            ...     print(timer.eta(n_iters - i))
+        """
+        self.stop()
+        self.start()
+
     def eta(self, left: int, return_str: bool = True) -> datetime.timedelta | str:
         """Calculate ETA.
 
