@@ -612,6 +612,88 @@ class AverageMeter:
         return self.format.format(**self.__dict__)
 
 
+class AverageMeters:
+    """AverageMeters.
+
+    Compose multiple AverageMeter objects.
+
+    Example:
+        ```python
+        meter = AverageMeters()
+        for _ in range(100):
+            loss1 = torch.randn(1)
+            loss2 = torch.randn(2)
+            meter.update(loss1=loss1, loss2=loss2)
+        ```
+
+    """
+
+    sep: str = ' | '
+
+    def __init__(self, format: str = '{name}: {avg:10.5f}'):
+        """AverageMeters.
+
+        Args:
+            format (str, optional): Default: '{name}: {avg:10.5f}'
+
+        """
+        self._meters: dict[str, AverageMeter] = {}
+        self.format = format
+
+    def get(self, name: str) -> AverageMeter | None:
+        """Get meter by name.
+
+        Args:
+            name (str): Name of the meter.
+
+        Returns:
+            (AverageMeter | None): meter
+
+        """
+        return self._meters.get(name)
+
+    def __getitem__(self, name: str) -> AverageMeter | None:
+        """Get meter like dict.
+
+        Args:
+            name (str): Name of the meter.
+
+        Returns:
+            (AverageMeter | None): meter
+
+        """
+        return self.get(name)
+
+    def reset(self, names: tuple[str] | None = None):
+        """Reset the meters.
+
+        Args:
+            names (tuple[str] | None, optional): Iterable with names of meters to reset. If not given all meters will
+                be reset. Default: None
+
+        """
+        names = names or self._meters.keys()
+        for name in names:
+            self.get(name).reset()
+
+    def update(self, **values):
+        """Update meters using key-value pair.
+
+        Args:
+            **values (dict[str, float | torch.Tensor]): Key value pairs of values to track.
+        """
+        for key, value in values.items():
+            if key not in self._meters:
+                self._meters[key] = AverageMeter(key, self.format)
+            self.get(key).update(value)
+
+    def __str__(self):
+        """Str."""
+        if len(self._meters) > 0:
+            return self.sep.join([str(meter) for meter in self._meters.values()])
+        return ''
+
+
 #######################################################################################################################
 ### Dataset                                                                                                         ###
 #######################################################################################################################
