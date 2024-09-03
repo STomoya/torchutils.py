@@ -25,7 +25,9 @@ select = [
     "PYI",
     "RUF",
     "TRY",
-    "D"
+    "D",
+    "D401",
+    "D413",
 ]
 ignore = [
     "C408",    # dict() statement. I like dict().

@@ -383,6 +383,7 @@ class Timer:
                 timer.step()
                 print(timer.eta(n_iters - i))
             ```
+
         """
         self.stop()
         self.start()
@@ -681,6 +682,7 @@ class AverageMeters:
 
         Args:
             **values (dict[str, float | torch.Tensor]): Key value pairs of values to track.
+
         """
         for key, value in values.items():
             if key not in self._meters:
