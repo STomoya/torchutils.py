@@ -177,13 +177,11 @@ def gather(
     If is not a distributed environment, this function will just return the input `obj`.
 
     Args:
-    ----
         obj (Any): object to gather. Can be a Tensor or picklable python object.
         dst (int, optional): destination device. If not given gathers to all devices. Default: None.
         into_tensor (bool, optional): If True and obj is a Tensor gather into a Tensor instead of a list. Default: True.
 
     Returns:
-    -------
         torch.Tensor | tuple[torch.Tensor] | tuple[Any]: gathered object.
 
     """
@@ -227,13 +225,11 @@ def reduce(tensor: torch.Tensor, dst: int | None = None, op: ReduceOp = ReduceOp
     If is not a distributed environment, this function will just return the input `obj`.
 
     Args:
-    ----
         tensor (torch.Tensor): Tensor to reduce.
         dst (int, optional): destination device. If not given reduced to all device. Default: None.
         op (ReduceOp, optional): reduce option. Default: ReduceOp.SUM.
 
     Returns:
-    -------
         torch.Tensor: reduced tensor.
 
     """
@@ -264,12 +260,10 @@ def natural_sort(iter: list[str], reverse: bool = False) -> list[str]:
     """Sort files by numbers.
 
     Args:
-    ----
         iter (list[str]): An iterable to sort.
         reverse (bool, optional): Reverse sorting. Default: False
 
     Returns:
-    -------
         list[str]: The sorted iterable.
 
     """
@@ -287,12 +281,10 @@ def timezone(offset: int, name: str | None = None) -> datetime.tzinfo:
     """Wrap datetime.timezone, supporting int for offset.
 
     Args:
-    ----
         offset (int): offset.
         name (str, optional): name. Defaults to None.
 
     Returns:
-    -------
         datetime.tzinfo: tzinfo
 
     """
@@ -302,8 +294,7 @@ def timezone(offset: int, name: str | None = None) -> datetime.tzinfo:
 def get_jst_timezone() -> datetime.tzinfo:
     """Create and return a JST (UCT+9) tzinfo object.
 
-    Returns
-    -------
+    Returns:
         tzinfo: JST tzinfo
 
     """
@@ -314,12 +305,10 @@ def get_now_string(format: str = '%Y%m%d%H%M%S', use_jst: bool = True) -> str:
     """Get datetime.datetime.now() as string.
 
     Args:
-    ----
         format (str, optional): format of the datetime. Default: '%Y%m%d%H%M%S'.
         use_jst (bool, optional): use jst timezone. Default: True.
 
     Returns:
-    -------
         str: datetime.
 
     """
@@ -341,7 +330,6 @@ class Timer:
         """Construct simple timer.
 
         Args:
-        ----
             track_durations (int | None, optional): Number of durations to track. Default: None.
             sync_cuda (bool, optional): Call torch.cuda.synchronize() before getting time. This must be True to get the
                 right duration. Default: False.
@@ -383,11 +371,27 @@ class Timer:
         if self.durations is not None:
             self.durations.append(duration)
 
+    def step(self):
+        """Stop then restart timer immediately.
+
+        Example:
+            ```python
+            timer = Timer()
+            timer.start()
+            for i in range(n_iters):
+                train_epoch()
+                timer.step()
+                print(timer.eta(n_iters - i))
+            ```
+
+        """
+        self.stop()
+        self.start()
+
     def eta(self, left: int, return_str: bool = True) -> datetime.timedelta | str:
         """Calculate ETA.
 
         Args:
-        ----
             left (int): How many iterations are left?
             return_str (bool, optional): Return the ETA as a str. Default: True.
 
@@ -422,7 +426,6 @@ def get_logger(
     If filename is given the logs will be saved to this file.
 
     Args:
-    ----
         name (str): name of the logger. identical to logging.getLogger(name) if already called once with the same name.
         level (int): Logging level. Default: logging.DEBUG.
         filename (str | None): filename to where the logs are saved. Default: None
@@ -432,7 +435,6 @@ def get_logger(
         auxiliary_handlers (list, optional): Other user-defined handlers. Default: None
 
     Returns:
-    -------
         logging.Logger: logger object.
 
     """
@@ -463,6 +465,237 @@ def get_logger(
     return logger
 
 
+def get_vram_usage(format: str = '{vram_usage:5.2f}%'):
+    """Calculate the current VRAM usage."""
+    if torch.cuda.is_available():
+        _, global_total = torch.cuda.mem_get_info()
+        vram_usage_percent = torch.cuda.memory_reserved() / global_total * 100
+    else:
+        vram_usage_percent = 0.0
+    return format.format(vram_usage=vram_usage_percent)
+
+
+class LoggerWithInterval:
+    """Logger with interval."""
+
+    def __init__(
+        self,
+        logger: logging.Logger,
+        interval: int,
+        max_iterations: int | None = None,
+        frequent_until: int = 100,
+        frequent_interval: int = 5,
+        first_and_last: bool = True,
+    ):
+        """Logger with interval.
+
+        Args:
+            logger (logging.Logger): The logger.
+            interval (int): Log interval.
+            frequent_until (int, optional): Log frequently for the first N iterations. Set to 0 to disable. Default: 100
+            frequent_interval (int, optional): Interval for the first `frequent_until` iterations. Default: 5
+            first_and_last (bool, optional): Always log on first and last iteration. Default: True
+            max_iterations (int | None, optional): Maximum iterations. Required if the last iterations should be logged.
+                Default: None
+
+        """
+        self.logger = logger
+
+        self.max_iterations = max_iterations
+        self.interval = interval
+        self.frequent_until = frequent_until
+        self.frequent_interval = frequent_interval
+        self.first_and_last = first_and_last
+
+        self.logged = False
+
+    def log(self, msg: str, level: str = 'info'):
+        """Log message.
+
+        Args:
+            msg (str): The message to log.
+            level (str, optional): Log level in string. Default: 'info'.
+
+        """
+        getattr(self.logger, level)(msg)
+
+    def __call__(self, msg: str, current: int, force: bool = False, level: str = 'info'):
+        """Log.
+
+        Args:
+            msg (str): The message to log.
+            current (int): Current iteration count.
+            force (bool, optional): Force logging. Default: False.
+            level (str, optional): Log level in string. Default: 'info'.
+
+        """
+        if (
+            current % self.interval == 0
+            or (current < self.frequent_until and current % self.frequent_interval == 0)
+            or (self.first_and_last and current in (self.max_iterations, 1))
+            or force
+        ):
+            self.log(msg=msg, level=level)
+            self.logged = True
+        else:
+            self.logged = False
+
+    @classmethod
+    def new(  # noqa: D102
+        cls,
+        name: str,
+        interval: int,
+        level: int = logging.DEBUG,
+        filename: str | None = None,
+        mode: str = 'a',
+        format: str = '%(asctime)s | %(name)s | %(filename)s | %(levelname)s | - %(message)s',
+        auxiliary_handlers: list | None = None,
+        frequent_until: int = 100,
+        frequent_interval: int = 5,
+        first_and_last: bool = True,
+        max_iterations: int | None = None,
+    ):
+        logger = get_logger(name, level, filename, mode, format, auxiliary_handlers)
+        logger = cls(
+            logger,
+            interval=interval,
+            frequent_until=frequent_until,
+            frequent_interval=frequent_interval,
+            first_and_last=first_and_last,
+            max_iterations=max_iterations,
+        )
+        return logger
+
+
+class AverageMeter:
+    """AverageMeter."""
+
+    def __init__(self, name: str, format: str = '{name}: {avg:10.5f}'):
+        """AverageMeter.
+
+        Args:
+            name (str): Name.
+            format (str, optional): Format for printing. Default: '{name}: {value:10.5f}'
+
+        """
+        self.name = name
+        self.format = format
+        self.val = 0.0
+        self.sum = 0.0
+        self.avg = 0.0
+        self.count = 0
+
+    def reset(self):
+        """Reset."""
+        self.val = 0.0
+        self.sum = 0.0
+        self.avg = 0.0
+        self.count = 0
+
+    def update(self, value: float | torch.Tensor):
+        """Update.
+
+        Args:
+            value (float | torch.Tensor): Value to average.
+
+        """
+        if torch.is_tensor(value):
+            value = value.detach()
+            self.sum += value.sum().item()
+            self.count += value.numel()
+        else:
+            self.sum += value
+            self.count += 1
+        self.avg = self.sum / self.count
+
+    def __str__(self):
+        """Str."""
+        return self.format.format(**self.__dict__)
+
+
+class AverageMeters:
+    """AverageMeters.
+
+    Compose multiple AverageMeter objects.
+
+    Example:
+        ```python
+        meter = AverageMeters()
+        for _ in range(100):
+            loss1 = torch.randn(1)
+            loss2 = torch.randn(2)
+            meter.update(loss1=loss1, loss2=loss2)
+        ```
+
+    """
+
+    sep: str = ' | '
+
+    def __init__(self, format: str = '{name}: {avg:10.5f}'):
+        """AverageMeters.
+
+        Args:
+            format (str, optional): Default: '{name}: {avg:10.5f}'
+
+        """
+        self._meters: dict[str, AverageMeter] = {}
+        self.format = format
+
+    def get(self, name: str) -> AverageMeter | None:
+        """Get meter by name.
+
+        Args:
+            name (str): Name of the meter.
+
+        Returns:
+            (AverageMeter | None): meter
+
+        """
+        return self._meters.get(name)
+
+    def __getitem__(self, name: str) -> AverageMeter | None:
+        """Get meter like dict.
+
+        Args:
+            name (str): Name of the meter.
+
+        Returns:
+            (AverageMeter | None): meter
+
+        """
+        return self.get(name)
+
+    def reset(self, names: tuple[str] | None = None):
+        """Reset the meters.
+
+        Args:
+            names (tuple[str] | None, optional): Iterable with names of meters to reset. If not given all meters will
+                be reset. Default: None
+
+        """
+        names = names or self._meters.keys()
+        for name in names:
+            self.get(name).reset()
+
+    def update(self, **values):
+        """Update meters using key-value pair.
+
+        Args:
+            **values (dict[str, float | torch.Tensor]): Key value pairs of values to track.
+
+        """
+        for key, value in values.items():
+            if key not in self._meters:
+                self._meters[key] = AverageMeter(key, self.format)
+            self.get(key).update(value)
+
+    def __str__(self):
+        """Str."""
+        if len(self._meters) > 0:
+            return self.sep.join([str(meter) for meter in self._meters.values()])
+        return ''
+
+
 #######################################################################################################################
 ### Dataset                                                                                                         ###
 #######################################################################################################################
@@ -481,7 +714,6 @@ def create_dataloader(
     """Create dataloader depending on the environment.
 
     Args:
-    ----
         dataset (Dataset): dataset
         batch_size (int): batch size
         shuffle (bool): Shuffle dataset. Default: True.
@@ -492,7 +724,6 @@ def create_dataloader(
         generator (torch.Generator): RNG. Default: None.
 
     Returns:
-    -------
         DataLoader: created dataloader.
 
     """
@@ -536,7 +767,6 @@ def get_dataloader_kwargs() -> tuple[Callable, torch.Generator]:
     DataLoader class.
 
     Example:
-    -------
         ```python
         from torch.utils.data import DataLoader
 
@@ -572,7 +802,6 @@ def set_seeds(
     """Set variables for reproducible training.
 
     Args:
-    ----
         seed (int | None, optional): Random number generator seed. Default: 3407.
         use_deterministic_algorithms (bool, optional): use deterministic algorithms?
             True for reproducibility. Default: False.
@@ -599,7 +828,6 @@ def local_seed_builtin(seed: int, enabled: bool = True):
     """Locally set the seed of builtin random module.
 
     Args:
-    ----
         seed (int): Seed.
         enabled (bool, optional): Enable local seed if True. Default: True.
 
@@ -619,7 +847,6 @@ def local_seed_numpy(seed: int, enabled: bool = True):
     """Locally set the seed of numpy.
 
     Args:
-    ----
         seed (int): Seed.
         enabled (bool, optional): Enable local seed if True. Default: True.
 
@@ -639,7 +866,6 @@ def local_seed_torch(seed: int, enabled: bool = True):
     """Locally set the seed of torch.
 
     Args:
-    ----
         seed (int): Seed.
         enabled (bool, optional): Enable local seed if True. Default: True.
 
@@ -668,7 +894,6 @@ def local_seed(seed: int, enabled: bool = True, builtin: bool = True, numpy: boo
     """Locally set the seed of builtin random, numpy, and torch.
 
     Args:
-    ----
         seed (int): Seed.
         enabled (bool, optional): Enable local seed if True. Default: True.
         builtin (bool, optional): Independent flag for builtin random. Ignored when enabled=False. Default: True.
@@ -697,7 +922,6 @@ def wrap_module(module: nn.Module, strategy: str, compile: bool | str = False) -
     But its faster to just call `torch.compile`.
 
     Args:
-    ----
         module (nn.Module): The module to wrap.
         strategy (str): Distributed parallel strategy. One of 'ddp', 'fsdp', and 'none'.
 
@@ -711,8 +935,7 @@ def wrap_module(module: nn.Module, strategy: str, compile: bool | str = False) -
             mode option. Default: False.
 
     Returns:
-    -------
-        tuple[nn.Module, nn.Module]: Wrapped module and compiled module.
+        (tuple[nn.Module, nn.Module]): Wrapped module and compiled module.
 
     """
     # str if compile is enabled, False otherwise.
@@ -783,12 +1006,10 @@ def _get_constant_schedule(num_warmup_steps: int | None = None, warmup_scale: fl
     """Get function for constant schedule.
 
     Args:
-    ----
         num_warmup_steps (int, optional): number of warmup steps.
         warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
-    -------
         Callable: always returns 1.0
 
     """
@@ -812,14 +1033,12 @@ def _get_multistep_schedule(
     """Create function for multistep schedules.
 
     Args:
-    ----
         milestones (list): list of steps on where to decay.
         num_warmup_steps (int, optional): number of warmup steps.
         gamma (float, optional): factor to decay on each milestone. Defaults to 0.1.
         warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
-    -------
         Callable: function for LambdaLR
 
     """
@@ -846,13 +1065,11 @@ def _get_linear_schedule(
     """Create function for linear schedule.
 
     Args:
-    ----
         num_training_steps (int): total number of training steps.
         num_warmup_steps (int, optional): number of warmup steps.
         warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
-    -------
         Callable: function for LambdaLR
 
     """
@@ -881,7 +1098,6 @@ def _get_polynomial_decay_schedule(
     """Create function for polynomial decay schedule.
 
     Args:
-    ----
         num_training_steps (int): total number of training steps.
         num_warmup_steps (int): number of warmup steps.
         lr_init (float): initial learning rate.
@@ -890,7 +1106,6 @@ def _get_polynomial_decay_schedule(
         warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
-    -------
         Callable: _description_
 
     """
@@ -929,14 +1144,12 @@ def _get_cosine_schedule(
     """Create function for consine schedule.
 
     Args:
-    ----
         num_training_steps (int): total number of training steps.
         num_warmup_steps (int, optional): number of warmup steps.
         num_cycles (float, optional): The number of waves in the cosine schedule. Default: 0.5.
         warmup_scale (float, optional): Constant used to scale lr in warmup.
 
     Returns:
-    -------
         Callable: function for LambdaLR
 
     """
@@ -979,7 +1192,6 @@ def create_scheduler(
     - cosine
 
     Args:
-    ----
         optimizer (Optimizer): the optimizer.
         type (str): name of the scheduler.
         num_training_steps (int): total number of training steps. assumes epochs.
@@ -993,7 +1205,6 @@ def create_scheduler(
         last_epoch (int, optional): last epoch for resume training. Default: -1.
 
     Returns:
-    -------
         LambdaLR: learning rate scheduler.
 
     """
@@ -1029,7 +1240,7 @@ def create_scheduler(
 def gradient_accumulation_steps(target_batch_size: int, batch_size: int) -> int:
     """Calculate gradient accumulation steps given the target batch size and batch size per iteration."""
     grad_accum_steps = target_batch_size // (batch_size * get_world_size())
-    return grad_accum_steps
+    return max(1, grad_accum_steps)
 
 
 #######################################################################################################################
@@ -1041,13 +1252,11 @@ def get_grad_scaler(enabled=True, is_fsdp=False) -> GradScaler | None:
     """Get the proper gradient scaler.
 
     Args:
-    ----
         enabled (bool, optional): Enable gradient scaling? Default: True.
         is_fsdp (bool, optional): is distributed mode FSDP? Default: False.
 
     Returns:
-    -------
-        GradScaler | None: gradient scaler class
+        (GradScaler | None): gradient scaler class
 
     """
     scaler = GradScaler(enabled=enabled) if not is_fsdp else ShardedGradScaler(enabled=enabled)
@@ -1255,7 +1464,6 @@ def save_checkpoint(
     Supports nn.Module, DDP, FSDP wrapped models.
 
     Args:
-    ----
         checkpoint_dir (str): The directory to save the models to.
         model (nn.Module | list[nn.Module]): Model or list of models to save.
         optimizer (Optimizer | list[nn.Module | None]): Optimizer or list of optimizers to save. The order must be
@@ -1265,7 +1473,6 @@ def save_checkpoint(
         others (dict[str, Any], optional): Other objects. Default: None.
 
     Example:
-    -------
         ```python
         model = create_model(...)
         optim = torch.optim.Adam(model.parameters())
@@ -1347,7 +1554,6 @@ def load_checkpoint(
     Supports nn.Module, DDP, FSDP wrapped models.
 
     Args:
-    ----
         checkpoint_dir (str): The directory to saved models.
         model (nn.Module | list[nn.Module]): Model or list of models to save. If using multiple models, the order must
             be completely same as the arguments passed to `save_checkpoint` function.
@@ -1359,11 +1565,9 @@ def load_checkpoint(
         allow_empty (bool): Allow the checkpoint_dir to not exist. If, so, do nothing and return. Default: False
 
     Returns:
-    -------
         dict: constants or python builtin objs that cannot be loaded by this function.
 
     Example:
-    -------
         ```python
         model = create_model(...)
         optim = torch.optim.Adam(model.parameters())

@@ -8,6 +8,9 @@ exclude = ["train_*.py"]
 [lint.per-file-ignores]
 "__init__.py" = ["F401", "F403", "F405"]
 
+[lint.pydocstyle]
+convention = "google"
+
 [lint]
 select = [
     "B",
@@ -22,7 +25,9 @@ select = [
     "PYI",
     "RUF",
     "TRY",
-    "D"
+    "D",
+    "D401",
+    "D413",
 ]
 ignore = [
     "C408",    # dict() statement. I like dict().
