@@ -1240,7 +1240,7 @@ def create_scheduler(
 def gradient_accumulation_steps(target_batch_size: int, batch_size: int) -> int:
     """Calculate gradient accumulation steps given the target batch size and batch size per iteration."""
     grad_accum_steps = target_batch_size // (batch_size * get_world_size())
-    return grad_accum_steps
+    return max(1, grad_accum_steps)
 
 
 #######################################################################################################################
